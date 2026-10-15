@@ -227,16 +227,7 @@ CRONTAB_PYTHON_EXECUTABLE = sys.executable
 CRONTAB_COMMAND_PREFIX = ''
 
 CRONJOBS = [
-    # (
-    #     '0 0 * * *',
-    #     'apps.inventory.tasks.expire_reservations',
-    #     f'>> {CRON_LOGS_DIR}/expire_reservations.log 2>&1',
-    # ),
-    # (
-    #     '* * * * *',
-    #     'apps.inventory.tasks.expire_blood_components',
-    #     f'>> {CRON_LOGS_DIR}/expire_blood_components.log 2>&1',
-    # ),
+    
 ]
 
 # =============================================================================
