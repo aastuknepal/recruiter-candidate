@@ -1,0 +1,27 @@
+.history
+.vscode
+static
+*.pyc
+# **/migrations/
+**/__pycache__/
+/__pycache__/
+media/
+mediafiles/
+**/log/
+**/venv/
+venv/
+.venv/
+**/staticfiles/
+*.ini
+.env
+.env.prod
+*.sqlite3
+pdfs/
+# db1.sqlite3
+# .db1.sqlite3
+
+.idea/
+.DS_Store
+
+#logs folder
+cron_logs/

@@ -1,0 +1,131 @@
+# =============================================================================
+# infra/docker-compose.yml
+#
+# Runs all infrastructure needed for the monorepo:
+#   - Kafka + Zookeeper
+#   - PostgreSQL (recruiter_db)
+#   - PostgreSQL (candidate_db)
+#   - MinIO (shared S3-compatible object storage)
+#   - Redis  (Celery broker for recruiter service)
+#   - MongoDB (NoSQL — candidate service)
+#
+# Usage:
+#   cd infra
+#   docker compose up -d
+# =============================================================================
+
+version: "3.9"
+
+services:
+
+  # ── Zookeeper (required by Kafka) ──────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: apply_zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  # ── Kafka Broker ─────────────────────────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: apply_kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"    # external (your local machine)
+      - "29092:29092"  # internal (docker network)
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  # ── Kafka UI (optional — handy for development) ──────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: apply_kafka_ui
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+  # ── PostgreSQL — Recruiter Service ──────────────────────────────────────────
+  recruiter_db:
+    image: postgres:16-alpine
+    container_name: apply_recruiter_db
+    restart: unless-stopped
+    ports:
+      - "5433:5432"    # map to 5433 so it doesn't conflict with local postgres
+    environment:
+      POSTGRES_DB: recruiter_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    volumes:
+      - recruiter_db_data:/var/lib/postgresql/data
+
+  # ── PostgreSQL — Candidate Service ──────────────────────────────────────────
+  candidate_db:
+    image: postgres:16-alpine
+    container_name: apply_candidate_db
+    restart: unless-stopped
+    ports:
+      - "5434:5432"    # map to 5434 so it doesn't conflict with recruiter's
+    environment:
+      POSTGRES_DB: candidate_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    volumes:
+      - candidate_db_data:/var/lib/postgresql/data
+
+  # ── MongoDB — Candidate Service (NoSQL / activity logs) ─────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: apply_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  # ── MinIO — Shared S3-compatible Object Storage ──────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: apply_minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"    # S3 API
+      - "9001:9001"    # MinIO Console UI
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  # ── Redis — Celery Broker (Recruiter Service) ─────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: apply_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+
+# ── Named Volumes ─────────────────────────────────────────────────────────────
+volumes:
+  recruiter_db_data:
+  candidate_db_data:
+  mongodb_data:
+  minio_data:
